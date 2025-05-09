@@ -11,6 +11,8 @@ pub enum Expr {
     }
 }
 
+
+
 impl Expr {
     fn fmt_with_parens(&self, fmtr: &mut fmt::Formatter<'_>, parent_prec: u8) -> fmt::Result {
         match self {
@@ -73,6 +75,13 @@ impl fmt::Display for Operator {
     }
 }
 
+
+#[derive(Debug, PartialEq)]
+pub enum EvalError {
+    DivisionByZero,
+    FloatInI64
+}
+
 pub fn evaluate(expr: &Expr) -> i64 {
     match expr {
         Expr::Int(n) => *n,
@@ -90,7 +99,7 @@ pub fn evaluate(expr: &Expr) -> i64 {
     }
 }
 
-pub fn evaluate_64(expr: &Expr) -> Result<f64, &'static str> {
+pub fn evaluate_64(expr: &Expr) -> Result<f64, EvalError> {
     match expr {
         Expr::Int(n) => Ok(*n as f64),
         Expr::Float(f) => Ok(*f),
@@ -104,7 +113,7 @@ pub fn evaluate_64(expr: &Expr) -> Result<f64, &'static str> {
                 Operator::Mul => Ok(l * r),
                 Operator::Div => {
                     if r == 0.0 {
-                        Err("division by Zero")
+                        Err(EvalError::DivisionByZero)
                     }else{
                         Ok(l / r)
                     }
@@ -116,10 +125,10 @@ pub fn evaluate_64(expr: &Expr) -> Result<f64, &'static str> {
     }
 }
 
-pub fn evaluate_i64(expr: &Expr) -> Result<i64, &'static str>{
+pub fn evaluate_i64(expr: &Expr) -> Result<i64, EvalError>{
     match expr {
         Expr::Int(n) => Ok(*n),
-        Expr::Float(f) => Ok(*f as i64),
+        Expr::Float(f) => Err(EvalError::FloatInI64),
         Expr::BinaryOp { left, op, right } => {
             let l = evaluate_i64(left)?;
             let r = evaluate_i64(right)?;
@@ -129,7 +138,7 @@ pub fn evaluate_i64(expr: &Expr) -> Result<i64, &'static str>{
                 Operator::Mul => Ok(l * r),
                 Operator::Div => {
                     if r == 0 {
-                        Err("division by Zero")
+                        Err(EvalError::DivisionByZero)
                     }else{
                         Ok(l / r)
                     }
@@ -168,7 +177,7 @@ pub fn div(l: Expr, r: Expr) -> Expr{
 mod tests{
 
 
-    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, sub, Expr, Operator};
+    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, sub, EvalError, Expr, Operator};
 
     #[test]
     fn test_expr_structure(){
@@ -284,7 +293,7 @@ mod tests{
     fn test_evaluate_f64_div_by_zero(){
         let expr = div(num(5), float(0.0));
         let result = evaluate_64(&expr);
-        assert_eq!(result, Err("division by Zero"));
+        assert_eq!(result, Err(EvalError::DivisionByZero));
     }
 
     #[test]
@@ -297,7 +306,7 @@ mod tests{
     fn test_evaluate_i64_division_by_zero(){
         let expr = div(num(5), num(0));
         let result = evaluate_i64(&expr);
-        assert_eq!(result, Err("division by Zero"));
+        assert_eq!(result, Err(EvalError::DivisionByZero));
     }
 
     #[test]
