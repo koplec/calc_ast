@@ -362,4 +362,16 @@ mod tests{
         let expected = div(num(1), num(2));
         assert_eq!(parsed, expected);
     }
+
+    #[test]
+    fn test_parse_expr_invalid_operator(){
+        let res = parse_expr("1 ? 2");
+        assert_eq!(res, Err("Unknown operator"));
+    }
+
+    #[test]
+    fn test_parse_expr_invalid_format(){
+        let res = parse_expr("1 +");
+        assert_eq!(res, Err("Expected format: <int> <op> <int>"));
+    }
 }
