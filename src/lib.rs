@@ -1,5 +1,4 @@
 use core::fmt;
-use std::fmt::{ write};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -117,13 +116,13 @@ pub fn evaluate_64(expr: &Expr) -> Result<f64, &'static str> {
     }
 }
 
-pub fn evaluate_safe(expr: &Expr) -> Result<i64, &'static str>{
+pub fn evaluate_i64(expr: &Expr) -> Result<i64, &'static str>{
     match expr {
         Expr::Int(n) => Ok(*n),
         Expr::Float(f) => Ok(*f as i64),
         Expr::BinaryOp { left, op, right } => {
-            let l = evaluate_safe(left)?;
-            let r = evaluate_safe(right)?;
+            let l = evaluate_i64(left)?;
+            let r = evaluate_i64(right)?;
             match op {
                 Operator::Add => Ok(l + r),
                 Operator::Sub => Ok(l - r),
@@ -169,7 +168,7 @@ pub fn div(l: Expr, r: Expr) -> Expr{
 mod tests{
 
 
-    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_safe, float, mul, num, sub, Expr, Operator};
+    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, sub, Expr, Operator};
 
     #[test]
     fn test_expr_structure(){
@@ -289,15 +288,15 @@ mod tests{
     }
 
     #[test]
-    fn test_evaluate_safe_success(){
+    fn test_evaluate_i64_success(){
         let expr = div(add(num(4), num(2)), num(2));
-        assert_eq!(evaluate_safe(&expr), Ok(3));
+        assert_eq!(evaluate_i64(&expr), Ok(3));
     }
 
     #[test]
-    fn test_evaluate_safe_division_by_zero(){
+    fn test_evaluate_i64_division_by_zero(){
         let expr = div(num(5), num(0));
-        let result = evaluate_safe(&expr);
+        let result = evaluate_i64(&expr);
         assert_eq!(result, Err("division by Zero"));
     }
 
