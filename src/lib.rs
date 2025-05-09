@@ -75,6 +75,24 @@ impl fmt::Display for Operator {
     }
 }
 
+pub fn parse_expr(input: &str) -> Result<Expr, &'static str> {
+    let tokens: Vec<&str> = input.split_whitespace().collect();
+    if tokens.len() != 3 {
+        return Err("Expected format: <int> <op> <int>");
+    }
+
+    let left = tokens[0].parse::<i64>().map_err(|_| "Invalid left number")?;
+    let op = match tokens[1] {
+        "+" => Operator::Add,
+        "-" => Operator::Sub,
+        "*" => Operator::Mul,
+        "/" => Operator::Div,
+        _ => return Err("Unknown operator"),
+    };
+    let right = tokens[2].parse::<i64>().map_err(|_| "Invalid right number")?;
+
+    Ok(bin(num(left), op, num(right)))
+}
 
 #[derive(Debug, PartialEq)]
 pub enum EvalError {
@@ -177,7 +195,7 @@ pub fn div(l: Expr, r: Expr) -> Expr{
 mod tests{
 
 
-    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, sub, EvalError, Expr, Operator};
+    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, parse_expr, sub, EvalError, Expr, Operator};
 
     #[test]
     fn test_expr_structure(){
@@ -322,5 +340,26 @@ mod tests{
         assert_eq!(format!("{}", expr), "1 + 2 + 3");
         let expr = add(add(num(1), num(4)), num(5));
         assert_eq!(format!("{}", expr), "1 + 4 + 5");
+    }
+
+
+    #[test]
+    fn test_parse_expr(){
+        let parsed = parse_expr("1 + 2").expect("Failed to parse 1 + 2");
+        let expected = add(num(1), num(2));
+        assert_eq!(parsed, expected);
+
+        let parsed = parse_expr("1 - 2").expect("Failed to parse 1 - 2");
+        let expected = sub(num(1), num(2));
+        assert_eq!(parsed, expected);
+
+
+        let parsed = parse_expr("1 * 2").expect("Failed to parse 1 * 2");
+        let expected = mul(num(1), num(2));
+        assert_eq!(parsed, expected);
+
+        let parsed = parse_expr("1 / 2").expect("Failed to parse 1 / 2");
+        let expected = div(num(1), num(2));
+        assert_eq!(parsed, expected);
     }
 }
