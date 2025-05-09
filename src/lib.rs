@@ -119,20 +119,26 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
 }
 
 pub fn parse_expr(input: &str) -> Result<Expr, &'static str> {
-    let tokens: Vec<&str> = input.split_whitespace().collect();
+    let tokens = tokenize(input)?;
     if tokens.len() != 3 {
         return Err("Expected format: <int> <op> <int>");
     }
 
-    let left = tokens[0].parse::<i64>().map_err(|_| "Invalid left number")?;
+    let left = match tokens[0] {
+        Token::Int(n) => n,
+        _ => return Err("Expected integer as left operand"),
+    };
     let op = match tokens[1] {
-        "+" => Operator::Add,
-        "-" => Operator::Sub,
-        "*" => Operator::Mul,
-        "/" => Operator::Div,
+        Token::Plus => Operator::Add,
+        Token::Minus => Operator::Sub,
+        Token::Star => Operator::Mul,
+        Token::Slash => Operator::Div,
         _ => return Err("Unknown operator"),
     };
-    let right = tokens[2].parse::<i64>().map_err(|_| "Invalid right number")?;
+    let right = match tokens[2] {
+        Token::Int(n) => n,
+        _ => return Err("Expected integer as right operand"),
+    };
 
     Ok(bin(num(left), op, num(right)))
 }
@@ -409,7 +415,7 @@ mod tests{
     #[test]
     fn test_parse_expr_invalid_operator(){
         let res = parse_expr("1 ? 2");
-        assert_eq!(res, Err("Unknown operator"));
+        assert_eq!(res, Err("Unknown character"));
     }
 
     #[test]
