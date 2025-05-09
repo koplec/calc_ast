@@ -75,6 +75,49 @@ impl fmt::Display for Operator {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Token {
+    Int(i64),
+    Plus,
+    Minus,
+    Star,
+    Slash
+}
+
+pub fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
+    let mut tokens = Vec::new();
+    //文字列を１文字ずつ取り出す
+    let mut chars = input.chars().peekable();
+
+    while let Some(&ch) = chars.peek() {
+        if ch.is_ascii_whitespace(){
+            chars.next();
+        }else if ch.is_ascii_digit() {
+            let mut num_str = String::new();
+            while let Some(&digit) = chars.peek() {
+                if digit.is_ascii_digit() {
+                    num_str.push(digit);
+                    chars.next();
+                }else{
+                    break;
+                }
+            }
+            let num = num_str.parse::<i64>().map_err(|_| "Failed to parse integer")?;
+            tokens.push(Token::Int(num));
+        }else{
+            match ch {
+                '+' => {tokens.push(Token::Plus); chars.next();},
+                '-' => {tokens.push(Token::Minus); chars.next();},
+                '*' => {tokens.push(Token::Star); chars.next();},
+                '/' => {tokens.push(Token::Slash); chars.next();},
+                _ => return Err("Unknown character"),
+            }
+        }
+    }
+
+    Ok(tokens)
+}
+
 pub fn parse_expr(input: &str) -> Result<Expr, &'static str> {
     let tokens: Vec<&str> = input.split_whitespace().collect();
     if tokens.len() != 3 {
@@ -195,7 +238,7 @@ pub fn div(l: Expr, r: Expr) -> Expr{
 mod tests{
 
 
-    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, parse_expr, sub, EvalError, Expr, Operator};
+    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, parse_expr, sub, tokenize, EvalError, Expr, Operator, Token};
 
     #[test]
     fn test_expr_structure(){
@@ -373,5 +416,30 @@ mod tests{
     fn test_parse_expr_invalid_format(){
         let res = parse_expr("1 +");
         assert_eq!(res, Err("Expected format: <int> <op> <int>"));
+    }
+
+
+    #[test]
+    fn test_tokenize_simple(){
+        use crate::Token::*;
+        let tokens = tokenize("1 + 2 * 3 / 4 - 5").expect("tokenize failed");
+        let expected = vec![
+            Int(1),
+            Plus,
+            Int(2),
+            Star,
+            Int(3),
+            Slash,
+            Int(4),
+            Minus, 
+            Int(5)
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_invalid_char(){
+        let res = tokenize("1 + 2 ? 3");
+        assert_eq!(res, Err("Unknown character"));
     }
 }
