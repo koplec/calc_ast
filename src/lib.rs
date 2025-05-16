@@ -168,8 +168,15 @@ pub fn parse_term(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static s
 
 pub fn parse_factor(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static str> {
     match tokens.next() {
-        Some(Token::Int(n)) => Ok(num(*n)), //num(*n)ってなに？
-        _ => Err("Expected integer"),
+        Some(Token::Int(n)) => Ok(num(*n)), //tokensでiterのときに&Tokenなので、Token::Int(n)のnが&i64になる
+        Some(Token::LParen) => {
+            let expr = parse_expr(tokens)?; //左かっこの中身を再帰的に読み取る
+            match tokens.next() {
+                Some(Token::RParen) => Ok(expr),
+                _ => Err("Expected closing parenthesis"),
+            }
+        }
+        _ => Err("Expected integer or opening parenthesis"),
     }
 }
 
@@ -274,7 +281,7 @@ pub fn div(l: Expr, r: Expr) -> Expr{
 mod tests{
 
 
-    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, parse_expr, sub, tokenize, EvalError, Expr, Operator, Token};
+    use crate::{add, bin, div, evaluate, evaluate_64, evaluate_i64, float, mul, num, parse_expr, parse_factor, sub, tokenize, EvalError, Expr, Operator, Token};
 
     #[test]
     fn test_expr_structure(){
@@ -470,7 +477,7 @@ mod tests{
         let tokens = tokenize("1+").expect("failed to tokenize 1 +");
         let mut iter = tokens.iter().peekable();
         let parsed = parse_expr(&mut iter);
-        assert_eq!(parsed, Err("Expected integer"));
+        assert_eq!(parsed, Err("Expected integer or opening parenthesis"));
     }
 
 
@@ -512,5 +519,39 @@ mod tests{
     fn test_tokenize_invalid_char(){
         let res = tokenize("1 + 2 ? 3");
         assert_eq!(res, Err("Unknown character"));
+    }
+
+
+    #[test]
+    fn test_parse_factor_integer(){
+        let tokens = vec![Token::Int(42)];
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_factor(&mut iter).expect("should parse int 42");
+        assert_eq!(parsed, num(42))
+    }
+
+    #[test]
+    fn test_parse_factor_with_parens(){
+        let tokens = vec![Token::LParen, Token::Int(1), Token::Plus, Token::Int(2), Token::RParen];
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_factor(&mut iter).expect("should parse parens");
+        let expected = add(num(1), num(2));
+        assert_eq!(parsed, expected);
+    }
+
+    #[test]
+    fn test_parse_factor_missing_rparen(){
+        let tokens = vec![Token::LParen, Token::Int(43), Token::Minus, Token::Int(2)];
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_factor(&mut iter);
+        assert_eq!(parsed, Err("Expected closing parenthesis"));
+    }
+
+    #[test]
+    fn test_parse_factor_invalid_token(){
+        let tokens = vec![Token::Plus];
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_factor(&mut iter);
+        assert_eq!(parsed, Err("Expected integer or opening parenthesis"))
     }
 }
