@@ -480,6 +480,15 @@ mod tests{
         assert_eq!(parsed, Err("Expected integer or opening parenthesis"));
     }
 
+    #[test]
+    fn test_parse_expr_with_parens(){
+        let tokens = tokenize("1 * (2 + 3)").expect("tokenize failed 1 * (2 + 3)");
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_expr(&mut iter).expect("parse failed 1 * (2 + 3)");
+
+        let expected = mul(num(1), add(num(2), num(3)));
+        assert_eq!(parsed, expected);
+    }
 
     #[test]
     fn test_tokenize_simple(){
