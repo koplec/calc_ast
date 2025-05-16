@@ -83,7 +83,9 @@ pub enum Token {
     Plus,
     Minus,
     Star,
-    Slash
+    Slash,
+    LParen, //(
+    RParen, //)
 }
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
@@ -112,6 +114,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
                 '-' => {tokens.push(Token::Minus); chars.next();},
                 '*' => {tokens.push(Token::Star); chars.next();},
                 '/' => {tokens.push(Token::Slash); chars.next();},
+                '(' => {tokens.push(Token::LParen); chars.next();},
+                ')' => {tokens.push(Token::RParen); chars.next();}
                 _ => return Err("Unknown character"),
             }
         }
@@ -484,6 +488,22 @@ mod tests{
             Int(4),
             Minus, 
             Int(5)
+        ];
+        assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn test_tokenize_paren_case(){
+        use crate::Token::*;
+        let tokens = tokenize("1*(2+3)").expect("tokenize failed 1*(2_3)");
+        let expected = vec![
+            Int(1),
+            Star,
+            LParen,
+            Int(2),
+            Plus,
+            Int(3),
+            RParen,
         ];
         assert_eq!(tokens, expected);
     }
