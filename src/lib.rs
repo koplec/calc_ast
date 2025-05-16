@@ -475,6 +475,12 @@ mod tests{
         assert_eq!(format!("{}", expr), "1 + 4 + 5");
     }
 
+    #[test]
+    fn test_expr_display_unary(){
+        let expr = Expr::UnaryOp { op: crate::UnaryOperator::Neg, expr: Box::new(add(num(1), num(2))) };
+        assert_eq!(format!("{}", expr), "-(1 + 2)");
+    }
+
 
     #[test]
     fn test_parse_expr(){
@@ -648,4 +654,5 @@ mod tests{
         );
         assert_eq!(parsed, expected);
     }
+
 }
