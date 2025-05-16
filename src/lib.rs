@@ -1,4 +1,6 @@
 use core::fmt;
+use std::{iter::Peekable};
+use std::slice::Iter;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -118,29 +120,53 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
     Ok(tokens)
 }
 
-pub fn parse_expr(input: &str) -> Result<Expr, &'static str> {
-    let tokens = tokenize(input)?;
-    if tokens.len() != 3 {
-        return Err("Expected format: <int> <op> <int>");
+// +, - でつなげていく
+pub fn parse_expr(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static str> {
+    let mut left = parse_term(tokens)?; //左でtermとして評価するところまでtokensを消費
+   
+    while let Some(token) = tokens.peek() { //現在のtokenの次もきちんとtokenがある間
+        match token {
+            Token::Plus | Token::Minus => { 
+                let op = match tokens.next().unwrap() {
+                    Token::Plus => Operator::Add,
+                    Token::Minus => Operator::Sub,
+                    _ => unreachable!(),
+                };
+                let right = parse_term(tokens)?;
+                left = bin(left, op, right);
+            },
+            _ => break,
+        }
     }
+    Ok(left)
+}
 
-    let left = match tokens[0] {
-        Token::Int(n) => n,
-        _ => return Err("Expected integer as left operand"),
-    };
-    let op = match tokens[1] {
-        Token::Plus => Operator::Add,
-        Token::Minus => Operator::Sub,
-        Token::Star => Operator::Mul,
-        Token::Slash => Operator::Div,
-        _ => return Err("Unknown operator"),
-    };
-    let right = match tokens[2] {
-        Token::Int(n) => n,
-        _ => return Err("Expected integer as right operand"),
-    };
+// *, / の演算
+pub fn parse_term(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static str> {
+    let mut left = parse_factor(tokens)?;
 
-    Ok(bin(num(left), op, num(right)))
+    while let Some(token) = tokens.peek() {
+        match token {
+            Token::Star | Token::Slash => {
+                let op = match tokens.next().unwrap() {
+                    Token::Star => Operator::Mul,
+                    Token::Slash => Operator::Div,
+                    _ => unreachable!(),
+                };
+                let right = parse_factor(tokens)?;
+                left = bin(left, op, right);
+            },
+            _ => break,
+        }
+    }
+    Ok(left)
+}
+
+pub fn parse_factor(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static str> {
+    match tokens.next() {
+        Some(Token::Int(n)) => Ok(num(*n)), //num(*n)ってなに？
+        _ => Err("Expected integer"),
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -394,34 +420,53 @@ mod tests{
 
     #[test]
     fn test_parse_expr(){
-        let parsed = parse_expr("1 + 2").expect("Failed to parse 1 + 2");
+        let tokens = tokenize("1 + 2").expect("Failed to parse");
+        let mut iter = tokens.iter().peekable(); 
+        //このpeekableってない？
+        // 次の要素を「見てから進むかどうか決められる」ようになる特別なイテレータ
+        let parsed = parse_expr(&mut iter).expect("Failed to parse 1 + 2");
+        // peekableは内部状態を持っていて、peek()やnext()を呼ぶと内部のポインタが進む
+        // &mutをつけると箱の中身を出したり戻したりできる
+        // &mutは変数iterを可変参照(mutable reference)として借りる記法
+        // let mutとしておかないと可変参照を宣言できない
+
         let expected = add(num(1), num(2));
         assert_eq!(parsed, expected);
 
-        let parsed = parse_expr("1 - 2").expect("Failed to parse 1 - 2");
+        let tokens = tokenize("1 - 2").expect("Failed to parse");
+        let mut iter = tokens.iter().peekable();
+
+        let parsed = parse_expr(&mut iter).expect("Failed to parse 1 - 2");
         let expected = sub(num(1), num(2));
         assert_eq!(parsed, expected);
 
 
-        let parsed = parse_expr("1 * 2").expect("Failed to parse 1 * 2");
+        let tokens = tokenize("1 * 2").expect("Failed to parse");
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_expr(&mut iter).expect("Failed to parse 1 * 2");
         let expected = mul(num(1), num(2));
         assert_eq!(parsed, expected);
+        
+        let tokens = tokenize("1 / 2").expect("Failed to token 1 / 2");
+        let mut iter = tokens.iter().peekable();
 
-        let parsed = parse_expr("1 / 2").expect("Failed to parse 1 / 2");
+        let parsed = parse_expr(&mut iter).expect("Failed to parse 1 / 2");
         let expected = div(num(1), num(2));
         assert_eq!(parsed, expected);
     }
 
     #[test]
     fn test_parse_expr_invalid_operator(){
-        let res = parse_expr("1 ? 2");
-        assert_eq!(res, Err("Unknown character"));
+        let res = tokenize("1 ? 2");
+        assert_eq!(res, Err("Unknown character"))
     }
 
     #[test]
     fn test_parse_expr_invalid_format(){
-        let res = parse_expr("1 +");
-        assert_eq!(res, Err("Expected format: <int> <op> <int>"));
+        let tokens = tokenize("1+").expect("failed to tokenize 1 +");
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_expr(&mut iter);
+        assert_eq!(parsed, Err("Expected integer"));
     }
 
 
