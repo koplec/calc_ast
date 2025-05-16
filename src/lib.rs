@@ -6,11 +6,25 @@ use std::slice::Iter;
 pub enum Expr {
     Int(i64),
     Float(f64),
+    UnaryOp {
+        op: UnaryOperator, 
+        // Box<Expr>はヒープに置いたExprを指すポインタ
+        // Exprは再帰的な構造になっている
+        // 再帰構造のサイズはコンパイル時には決まらない
+        // Box<Expr>はポインタのサイズで一定(8バイト)
+        // これはら、コンパイル時にサイズが一定になる
+        expr: Box<Expr> 
+    },
     BinaryOp {
         left: Box<Expr>,
         op: Operator,
         right: Box<Expr>,
     }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryOperator{
+    Neg,
 }
 
 
@@ -20,6 +34,14 @@ impl Expr {
         match self {
             Expr::Int(n) => write!(fmtr, "{}", n),
             Expr::Float(f) => write!(fmtr, "{}", f),
+            Expr::UnaryOp { op, expr } => {
+                match op {
+                    UnaryOperator::Neg => {
+                        write!(fmtr, "-")?;
+                        expr.fmt_with_parens(fmtr, 10)
+                    }
+                }
+            },
             Expr::BinaryOp { left, op, right } => {
                 let my_prec = op.precedence();
                 // 親演算子よりも優先度が低いときは、かっこが必要
@@ -169,6 +191,10 @@ pub fn parse_term(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static s
 pub fn parse_factor(tokens: &mut Peekable<Iter<Token>>) -> Result<Expr, &'static str> {
     match tokens.next() {
         Some(Token::Int(n)) => Ok(num(*n)), //tokensでiterのときに&Tokenなので、Token::Int(n)のnが&i64になる
+        Some(Token::Minus) => {
+            let expr = parse_factor(tokens)?;
+            Ok(Expr::UnaryOp { op: UnaryOperator::Neg, expr: Box::new(expr) })
+        }
         Some(Token::LParen) => {
             let expr = parse_expr(tokens)?; //左かっこの中身を再帰的に読み取る
             match tokens.next() {
@@ -190,6 +216,12 @@ pub fn evaluate(expr: &Expr) -> i64 {
     match expr {
         Expr::Int(n) => *n,
         Expr::Float(f) => *f as i64,
+        Expr::UnaryOp { op, expr } => {
+            let val = evaluate(expr);
+            match op {
+                UnaryOperator::Neg => -val,
+            }
+        },
         Expr::BinaryOp { left, op, right } => {
             let l = evaluate(left);
             let r = evaluate(right);
@@ -207,6 +239,12 @@ pub fn evaluate_64(expr: &Expr) -> Result<f64, EvalError> {
     match expr {
         Expr::Int(n) => Ok(*n as f64),
         Expr::Float(f) => Ok(*f),
+        Expr::UnaryOp { op, expr } => {
+            let val = evaluate_64(expr)?;
+            match op {
+                UnaryOperator::Neg => Ok(-val)
+            }
+        },
         Expr::BinaryOp {left, op, right} => {
             let l = evaluate_64(left)?;
             let r = evaluate_64(right)?;
@@ -233,6 +271,15 @@ pub fn evaluate_i64(expr: &Expr) -> Result<i64, EvalError>{
     match expr {
         Expr::Int(n) => Ok(*n),
         Expr::Float(f) => Err(EvalError::FloatInI64),
+        Expr::UnaryOp { op, expr } => {
+            // exprは&Box<Expr>だけれどevaluate_i64の第１引数に入れられる
+            // これはRustのDefer強制という仕組みがあって、Box<Expr>を使う場面で
+            // &Exprが必要であれば、自動的に参照を解決してくれる仕組み
+            let val = evaluate_i64(expr)?;
+            match op {
+                UnaryOperator::Neg => Ok(-val)
+            }
+        },
         Expr::BinaryOp { left, op, right } => {
             let l = evaluate_i64(left)?;
             let r = evaluate_i64(right)?;
@@ -562,5 +609,43 @@ mod tests{
         let mut iter = tokens.iter().peekable();
         let parsed = parse_factor(&mut iter);
         assert_eq!(parsed, Err("Expected integer or opening parenthesis"))
+    }
+
+    #[test]
+    fn test_parse_unary_minus(){
+        let tokens = tokenize("-42").expect("tokenize failed -42");
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_expr(&mut iter).expect("parse failed -42");
+        let expected = Expr::UnaryOp { op: crate::UnaryOperator::Neg, expr: Box::new(num(42)) };
+        assert_eq!(parsed, expected);
+    }
+
+    #[test]
+    fn test_parse_minus_equation(){
+        let tokens = tokenize("-(2+3)").expect("tokenize -(2+3) failed");
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_expr(&mut iter).expect("parse -(2+3) failed");
+        let expected = Expr::UnaryOp {
+            op: crate::UnaryOperator::Neg,
+            expr: Box::new(add(num(2), num(3)))
+        };
+        assert_eq!(parsed, expected);
+    }
+
+    #[test]
+    fn test_parse_minus_equation2(){
+        let tokens = tokenize("-4*2")
+            .expect("tokenize -4*2 failed");
+        let mut iter = tokens.iter().peekable();
+        let parsed = parse_expr(&mut iter)
+            .expect("parse -4*2 failed");
+        let expected = mul(
+            Expr::UnaryOp {
+                op: crate::UnaryOperator::Neg,
+                expr: Box::new(num(4))
+            },
+            num(2)
+        );
+        assert_eq!(parsed, expected);
     }
 }
